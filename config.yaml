@@ -6,7 +6,9 @@ iot:
     notification_target: 'http://localhost:8088/notification'
 #    notification_target: 'http://orm-viotserver:1026/notification'
 
-  notification_prefix:
+  notification:
+    interna_name: '6_IOT_VAL'
+    type: 'FieldsGroup'
     component: '3_GC_IOT_'
     magnitude: '3_GC_IOT_'
     value: '3_GC_IOT_Valor'
