@@ -53,7 +53,7 @@ def get_row_model(entity, key):
                 "TextValue": value_str
             },
             {
-                "InternalName": COMPONENTS_PREFIX + key,
+                "InternalName": MAGNITUDE_PREFIX + key,
                 "Type": type,
                 "TextValue": value_str
             },
