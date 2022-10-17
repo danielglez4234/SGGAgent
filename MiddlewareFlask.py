@@ -12,57 +12,20 @@ def get_config(path):
         data = yaml.safe_load(file)
     return data
 
-
 config = get_config("config.yaml")['iot']
+
 HOSTNAME = config['server']['hostname']
 PORT = config['server']['port']
 SUBSCRIPTION_TARGET = config['server']['subscription_target']
 NOTIFICATION_TARGET = config['server']['notification_target']
-COMPONENTS_PREFIX = config['notification_prefix']['component']
-MAGNITUDE_PREFIX = config['notification_prefix']['magnitude']
-VALUE_PREFIX = config['notification_prefix']['value']
 
+COMPONENTS_PREFIX = config['notification']['component']
+MAGNITUDE_PREFIX = config['notification']['magnitude']
+VALUE_PREFIX = config['notification']['value']
 
-# ROWS EXAMPLE
-# {
-#     "InternalName": "6_IOT_VAL",  # siempre igual
-#     "Type": "FieldsGroup",
-#     "FieldsGroupValue": [
-#         {
-#             "Row": [
-#                 {
-#                     "InternalName": "3_GC_IOT_humidity",
-#                     "Type": "Text",
-#                     "TextValue": "Valooooor"
-#                 },
-#                 {
-#                     "InternalName": "3_GC_IOT_WeatherStation",
-#                     "Type": "Text",
-#                     "TextValue": "Valooooor"
-#                 },
-#                 {
-#                     "InternalName": "3_GC_IOT_Valor",
-#                     "Type": "Decimal",
-#                     "TextValue": "Valooooor"
-#                 }
-#             ],
-#             "Row": [
-#                 {
-#                     "InternalName": "3_GC_IOT_NombreComponente",
-#                     "Type": "Text",
-#                     "TextValue": "Valooooor"
-#                 },
-#             ],
-#             "Row": [
-#                 {
-#                     "InternalName": "3_GC_IOT_Valor",
-#                     "Type": "Decimal",
-#                     "TextValue": "Valooooor"
-#                 }
-#             ]
-#         }
-#     ]
-# }
+SGG_INTERNAL_NAME = config['notification']['interna_name']
+SGG_TYPE = config['notification']['type']
+
 
 
 # 
@@ -79,24 +42,54 @@ def unquote(elements):
 # 
 # create attributes data rows
 # 
-def create_row():
-    pass
+def get_row_model(entity, key):
+    type = entity["type"]
+    value_str = str(entity[key])
+    return {
+        "Row": [
+            {
+                "InternalName": COMPONENTS_PREFIX + key,
+                "Type": type,
+                "TextValue": value_str
+            },
+            {
+                "InternalName": COMPONENTS_PREFIX + key,
+                "Type": type,
+                "TextValue": value_str
+            },
+            {
+                "InternalName": VALUE_PREFIX,
+                "Type": type,
+                "TextValue": value_str
+            },
+        ]
+    }
+
+# 
+# create attributes data rows
+# 
+def create_fields_group_value(entity):
+    rows = []
+    # iterate over entity attributes 
+    for key in entity:
+        if key == "id" or key == "type":
+            continue
+        rows.append( get_row_model(entity, key) )
+    return rows
 
 
 def create_attr_data(notification_data):
     notification_model = {
-        "InternalName": "6_IOT_VAL",
-        "Type": "FieldsGroup",
-        "FieldsGroupValue": []
+        "InternalName": SGG_INTERNAL_NAME,
+        "Type": SGG_TYPE,
     }
     print(notification_data)
     #
     #  create arrange of components attributes
     #
-    notification_model["FieldsGroupValue"].append(
-        create_row()
-    )
-
+    data = notification_data["data"]
+    for entity in data:   
+        notification_model["FieldsGroupValue"] = create_fields_group_value(entity)
     return notification_model
 
 
@@ -162,10 +155,10 @@ def notify():
     print("--------------------------------------------------------")
     print(json_post)
     # create response object
-    # json_response = createAttrData(json_post)
+    json_response = create_attr_data(json_post)
 
-    # r = requests.post(dest_page, json=json_post, headers={"apikey": headers['Apikey'], "userdata": headers['Userdata']})
-    # return json_response, r.status_code
+    r = requests.post(dest_page, json=json_post, headers={"apikey": headers['Apikey'], "userdata": headers['Userdata']})
+    return json_response, r.status_code
 
 
 # 
