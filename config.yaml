@@ -1,0 +1,12 @@
+iot:
+  server:
+    hostname: localhost
+    port: '8088'
+    subscription_target: 'http://orm-viotserver:1026/v2/subscriptions'
+    notification_target: 'http://localhost:8088/notification'
+#    notification_target: 'http://orm-viotserver:1026/notification'
+
+  notification_prefix:
+    component: '3_GC_IOT_'
+    magnitude: '3_GC_IOT_'
+    value: '3_GC_IOT_Valor'
