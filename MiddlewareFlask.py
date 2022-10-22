@@ -3,8 +3,7 @@ import urllib.parse
 import requests
 import yaml
 from flask import Flask, abort, request, jsonify, Response
-# CORS
-from flask_cors import CORS
+import numpy as np
 
 
 def get_config(path):
@@ -14,25 +13,35 @@ def get_config(path):
 
 
 config = get_config("config.yaml")['iot']
+server = config['server']
+notification = config['notification']
+
 # server config variables
-HOSTNAME = config['server']['hostname']
-PORT = config['server']['port']
-SUBSCRIPTION_TARGET = config['server']['subscription_target']
+HOSTNAME            = server['hostname']
+PORT                = server['port']
+SUBSCRIPTION_TARGET = server['subscription_target']
+
 # notification config variables
-COMPONENTS_PREFIX = config['notification']['component']
-MAGNITUDE_PREFIX = config['notification']['magnitude']
-VALUE_PREFIX = config['notification']['value']
+COMPONENTS_PREFIX    = notification['component']
+MAGNITUDE_PREFIX     = notification['magnitude']
+TEXT_VALUE_PREFIX    = notification['text_value']
+DECIMAL_VALUE_PREFIX = notification['decimal_value']
+REQUIRED_HEADERS     = notification['required_headers']
+
 # json model config variables
-SGG_INTERNAL_NAME = config['notification']['internal_name']
-SGG_TYPE = config['notification']['type']
-# required headers
-REQUIRED_HEADERS = config['notification']['required_headers']
+NOTIFICATION_MODEL = {
+    "PanelFields": [{
+        "InternalName": notification['internal_name'],
+        "Type": notification['type'],
+    }]
+}
 
+#
+# ---------------------------------------------------------------------
 # init flask app
+# ---------------------------------------------------------------------
+#
 app = Flask(__name__)
-
-
-# cors = CORS(app, resources={r"/*": {"origins": "http://" + HOSTNAME + ":" + PORT}})
 
 
 #
@@ -47,76 +56,55 @@ def unquote(elements):
 
 
 #
-# get value label and value
+# get value label and value depending on type
 #
-def get_properties(value):
+def value_model_by_type(value):
     if isinstance(value, int):
-        return {"type_value": "Decimal", "value_label": "DecimalValue"}
-    return {"type_value": "Text", "value_label": "TextValue"}
+       return get_row_model(DECIMAL_VALUE_PREFIX, "Decimal", "DecimalValue", value)
+    return get_row_model(TEXT_VALUE_PREFIX, "Text", "TextValue", value)
+
+
+#
+# get row element model
+#
+def get_row_model(name, type, label, value):
+    return {
+        "InternalName": name,
+        "Type": type,
+        label: value
+    }
 
 
 #
 # create attributes data rows
 # 
-def get_row_model(entity, attr):
-    component = entity["id"]
-    magnitude = attr
-    value = entity[attr]["value"]
-    props = get_properties(value)
+def create_row(entity, attribute):
+    value = entity[attribute]["value"]
     return {
         "Row": [
-            {
-                "InternalName": COMPONENTS_PREFIX,
-                "Type": "Text",
-                "TextValue": component
-            },
-            {
-                "InternalName": MAGNITUDE_PREFIX,
-                "Type": "Text",
-                "TextValue": magnitude
-            },
-            {
-                "InternalName": VALUE_PREFIX,
-                "Type": props["type_value"],
-                [props["value_label"]]: value
-            },
+            get_row_model(COMPONENTS_PREFIX, "Text", "TextValue", entity["id"]),
+            get_row_model(MAGNITUDE_PREFIX, "Text", "TextValue", attribute),
+            value_model_by_type(value)
         ]
     }
 
-
+#
+#  
+#
 def create_attr_data(notification_data):
-    notification_model = {
-        "PanelFields": [{
-            "InternalName": SGG_INTERNAL_NAME,
-            "Type": SGG_TYPE,
-        }]
-    }
-    fields_group_values = []
-    #  create arrange of components attributes
     data = notification_data["data"]
+    
+    fields_group_values = []
     for entity in data:
         for attribute in entity:
             if attribute == "id" or attribute == "type":
                 continue
-            fields_group_values.append(get_row_model(entity, attribute))
+            fields_group_values.append(
+                create_row(entity, attribute)
+            )
 
-    notification_model["PanelFields"][0]["FieldsGroupValue"] = fields_group_values
-    return notification_model
-
-
-# 
-# create new notification object if it doesn't already exist
-#
-# def create_httpCustom(notification):
-#     return {
-#         "httpCustom": {
-#             "url": notification['http']['url'],
-#             "headers": {
-#                 "destPage": NOTIFICATION_TARGET,
-#             },
-#             'method': 'POST'
-#         }
-#     }
+    NOTIFICATION_MODEL["PanelFields"][0]["FieldsGroupValue"] = fields_group_values
+    return NOTIFICATION_MODEL
 
 
 # 
@@ -126,16 +114,17 @@ def create_attr_data(notification_data):
 def subscribe():
     data = urllib.parse.quote(request.data.decode('utf-8'), safe='\"\n\t {}:,[]\\/$%')
     json_post = json.JSONDecoder().decode(data)
-    # create and assign httpCustom and destPage if not exists
+    
     notification = json_post['notification']
     notification_attrs = list(notification)
+    
     if 'httpCustom' not in notification_attrs:
         abort(403, '{"message": "HttpCustom is a required field inside the notification object."}')
 
-    # httpCustom_headers = list(notification['httpCustom']['headers'])
-    # if all(value not in httpCustom_headers for value in REQUIRED_HEADERS):
-    #     abort(403, '{"message": "Check that the headers include the following requested fields: ' + str(
-    #         REQUIRED_HEADERS) + '"}')
+    httpCustom_headers = list(notification['httpCustom']['headers'])
+    if all(value not in httpCustom_headers for value in REQUIRED_HEADERS):
+        abort(403, '{"message": "Check that the headers include the following requested fields: ' + str(
+            REQUIRED_HEADERS) + '"}')
 
     print(json_post)
     r = requests.post(SUBSCRIPTION_TARGET, json=json_post, headers=request.headers)
@@ -148,9 +137,7 @@ def subscribe():
 @app.route("/notification", methods=['POST'])
 def notify():
     data = urllib.parse.unquote(request.data.decode('utf-8'))
-    print(data)
     headers = unquote(request.headers)
-    print(headers)
     headers_keys = list(headers)
     # if "Destpage" not in headers_keys:
     if all(value not in headers_keys for value in REQUIRED_HEADERS):
@@ -159,11 +146,11 @@ def notify():
     else:
         # get required headers
         dest_page = headers.pop("Destpage")
-        api_key = headers.pop("Apikey")
+        api_key   = headers.pop("Apikey")
         user_data = headers.pop("Userdata")
         # create response object
         json_decode = json.JSONDecoder().decode(data)
-        json_post = create_attr_data(json_decode)
+        json_post   = create_attr_data(json_decode)
         print(json_post)
         r = requests.post(dest_page, json=json_post, headers={"apikey": api_key, "userdata": user_data})
         return r.text, r.status_code
@@ -176,13 +163,6 @@ def notify():
 def delete(subscription_id):
     r = requests.delete(SUBSCRIPTION_TARGET + subscription_id)
     return r.text, r.status_code
-
-
-# @app.route("/subscriptions", methods=['GET'])
-# def delete_with_body():
-#     id = request.json['id']
-#     r = requests.delete(SUBSCRIPTION_TARGET + id)
-#     return r.text, r.status_code
 
 
 # 
