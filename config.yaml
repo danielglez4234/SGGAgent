@@ -10,5 +10,5 @@ iot:
     type: 'FieldsGroup'
     component: '3_GC_IOT_NombreComponente'
     magnitude: '3_GC_IOT_NombreMag'
-    text_value: '3_GC_IOT_Valor_??'
-    decimal_value: '3_GC_IOT_Valor_??'
+    text_value: '3_GC_IOT_ValString'
+    decimal_value: '3_GC_IOT_Valor'
