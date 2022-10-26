@@ -1,7 +1,7 @@
 iot:
   server:
     hostname: 172.18.1.22
-    port: 10500
+    port: 8088
     subscription_target: 'http://orm-viotserver:1026/v2/subscriptions'
 
   notification:
