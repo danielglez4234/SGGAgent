@@ -1,6 +1,6 @@
 iot:
   server:
-    hostname: 161.72.123.211
+    hostname: localhost
     port: 8088
     subscription_target: 'http://orm-viotserver:1026/v2/subscriptions'
 
