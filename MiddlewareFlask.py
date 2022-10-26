@@ -3,7 +3,6 @@ import urllib.parse
 import requests
 import yaml
 from flask import Flask, abort, request, jsonify, Response
-import numpy as np
 
 
 def get_config(path):
@@ -17,16 +16,16 @@ server = config['server']
 notification = config['notification']
 
 # server config variables
-HOSTNAME            = server['hostname']
-PORT                = server['port']
+HOSTNAME = server['hostname']
+PORT = server['port']
 SUBSCRIPTION_TARGET = server['subscription_target']
 
 # notification config variables
-COMPONENTS_PREFIX    = notification['component']
-MAGNITUDE_PREFIX     = notification['magnitude']
-TEXT_VALUE_PREFIX    = notification['text_value']
+COMPONENTS_PREFIX = notification['component']
+MAGNITUDE_PREFIX = notification['magnitude']
+TEXT_VALUE_PREFIX = notification['text_value']
 DECIMAL_VALUE_PREFIX = notification['decimal_value']
-REQUIRED_HEADERS     = notification['required_headers']
+REQUIRED_HEADERS = notification['required_headers']
 
 # json model config variables
 NOTIFICATION_MODEL = {
@@ -59,9 +58,9 @@ def unquote(elements):
 # get value label and value depending on type
 #
 def value_model_by_type(value):
-    if isinstance(value, int):
-       return get_row_model(DECIMAL_VALUE_PREFIX, "Decimal", "DecimalValue", value)
-    return get_row_model(TEXT_VALUE_PREFIX, "Text", "TextValue", value)
+    if type(value) == str:
+        return get_row_model(TEXT_VALUE_PREFIX, "Text", "TextValue", value)
+    return get_row_model(DECIMAL_VALUE_PREFIX, "Decimal", "DecimalValue", value)
 
 
 #
@@ -88,12 +87,13 @@ def create_row(entity, attribute):
         ]
     }
 
+
 #
-#  
+# create FieldsGroupValue data
 #
 def create_attr_data(notification_data):
     data = notification_data["data"]
-    
+
     fields_group_values = []
     for entity in data:
         for attribute in entity:
@@ -114,17 +114,17 @@ def create_attr_data(notification_data):
 def subscribe():
     data = urllib.parse.quote(request.data.decode('utf-8'), safe='\"\n\t {}:,[]\\/$%')
     json_post = json.JSONDecoder().decode(data)
-    
-    notification = json_post['notification']
-    notification_attrs = list(notification)
-    
+
+    notification_ = json_post['notification']
+    notification_attrs = list(notification_)
+
     if 'httpCustom' not in notification_attrs:
         abort(403, '{"message": "HttpCustom is a required field inside the notification object."}')
 
-    httpCustom_headers = list(notification['httpCustom']['headers'])
-    if all(value not in httpCustom_headers for value in REQUIRED_HEADERS):
-        abort(403, '{"message": "Check that the headers include the following requested fields: ' + str(
-            REQUIRED_HEADERS) + '"}')
+    # httpCustom_headers = list(notification['httpCustom']['headers'])
+    # if all(value not in httpCustom_headers for value in REQUIRED_HEADERS):
+    #     abort(403, '{"message": "Check that the headers include the following requested fields: ' + str(
+    #         REQUIRED_HEADERS) + '"}')
 
     print(json_post)
     r = requests.post(SUBSCRIPTION_TARGET, json=json_post, headers=request.headers)
@@ -146,11 +146,11 @@ def notify():
     else:
         # get required headers
         dest_page = headers.pop("Destpage")
-        api_key   = headers.pop("Apikey")
+        api_key = headers.pop("Apikey")
         user_data = headers.pop("Userdata")
         # create response object
         json_decode = json.JSONDecoder().decode(data)
-        json_post   = create_attr_data(json_decode)
+        json_post = create_attr_data(json_decode)
         print(json_post)
         r = requests.post(dest_page, json=json_post, headers={"apikey": api_key, "userdata": user_data})
         return r.text, r.status_code
